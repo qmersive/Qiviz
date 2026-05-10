@@ -38,20 +38,21 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     try {
       final supabase = Supabase.instance.client;
       final user = supabase.auth.currentUser;
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}${p.extension(_videoFile!.path)}';
+      final fileName = '${user?.id}_${DateTime.now().millisecondsSinceEpoch}${p.extension(_videoFile!.path)}';
       final path = 'dares/$fileName';
 
-      // 1. Upload to Storage
+      // 1. Upload to Storage (Make sure 'media' bucket exists and is public)
       await supabase.storage.from('media').upload(path, _videoFile!);
       final videoUrl = supabase.storage.from('media').getPublicUrl(path);
 
-      // 2. Insert into DB
+      // 2. Insert into DB (Using creator_id to match schema.sql)
       await supabase.from('dares').insert({
-        'user_id': user?.id,
+        'creator_id': user?.id,
         'title': _titleController.text,
         'description': _descriptionController.text,
         'video_url': videoUrl,
         'is_active': true,
+        'end_time': DateTime.now().add(const Duration(days: 7)).toIso8601String(),
       });
 
       if (mounted) {
@@ -59,7 +60,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         Navigator.pop(context);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: Ensure "media" bucket exists in Supabase. Error: $e')));
     } finally {
       if (mounted) setState(() => _isUploading = false);
     }

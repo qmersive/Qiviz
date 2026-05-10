@@ -189,11 +189,18 @@ class _HomeScreenState extends State<HomeScreen> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Discover', style: GoogleFonts.outfit(fontSize: 32, fontWeight: FontWeight.bold, color: AppTheme.textWhite)),
-              Text('Find your tribe', style: GoogleFonts.inter(color: AppTheme.textGrey)),
+              ShaderMask(
+                shaderCallback: (bounds) => AppTheme.primaryGradient.createShader(bounds),
+                child: Text('Discover', style: GoogleFonts.outfit(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white)),
+              ),
+              Text('Connect across cultures', style: GoogleFonts.inter(color: AppTheme.textGrey)),
             ],
           ),
-          const CircleAvatar(backgroundColor: AppTheme.surfaceDark, child: Icon(Icons.notifications_none, color: AppTheme.textWhite)),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: AppTheme.surfaceDark, borderRadius: BorderRadius.circular(12)),
+            child: const Icon(Icons.notifications_none, color: AppTheme.electricBlue),
+          ),
         ],
       ),
     );
@@ -206,7 +213,7 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-          child: Text('Live Now 🟢', style: GoogleFonts.outfit(color: AppTheme.electricBlue, fontWeight: FontWeight.bold)),
+          child: Text('Live Now 🟢', style: GoogleFonts.outfit(color: AppTheme.acidGreen, fontWeight: FontWeight.bold)),
         ),
         SizedBox(
           height: 100,
@@ -226,10 +233,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         children: [
                           Container(
                             padding: const EdgeInsets.all(2),
-                            decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [AppTheme.electricBlue, AppTheme.primaryPurple])),
-                            child: CircleAvatar(radius: 30, backgroundColor: AppTheme.surfaceDark, child: Text(user['name'][0])),
+                            decoration: const BoxDecoration(shape: BoxShape.circle, gradient: AppTheme.primaryGradient),
+                            child: CircleAvatar(
+                              radius: 30,
+                              backgroundColor: AppTheme.surfaceDark,
+                              backgroundImage: user['profile_photo_url'] != null ? NetworkImage(user['profile_photo_url']) : null,
+                              child: user['profile_photo_url'] == null ? Text(user['name'][0]) : null,
+                            ),
                           ),
-                          Positioned(right: 2, bottom: 2, child: Container(width: 14, height: 14, decoration: BoxDecoration(color: Colors.green, shape: BoxShape.circle, border: Border.all(color: AppTheme.darkBackground, width: 2)))),
+                          Positioned(right: 2, bottom: 2, child: Container(width: 14, height: 14, decoration: BoxDecoration(color: AppTheme.acidGreen, shape: BoxShape.circle, border: Border.all(color: AppTheme.darkBackground, width: 2)))),
                         ],
                       ),
                       const SizedBox(height: 4),

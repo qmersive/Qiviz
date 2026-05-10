@@ -16,10 +16,12 @@ class MainScaffold extends StatefulWidget {
 class _MainScaffoldState extends State<MainScaffold> {
   int _currentIndex = 0;
 
+  // We have 5 slots in BottomNavBar, so we need 5 items in the Stack
+  // Index 2 is the placeholder for the Floating Action Button
   final List<Widget> _screens = [
     const HomeScreen(),
     const DaresScreen(),
-    const SizedBox(), // Placeholder for FAB
+    const CreatePostScreen(), // This won't be seen via Nav, only via FAB
     const ChatListScreen(),
     const ProfileScreen(),
   ];
@@ -33,7 +35,11 @@ class _MainScaffoldState extends State<MainScaffold> {
         children: _screens,
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CreatePostScreen())),
+        onPressed: () {
+          // When clicking the plus, we can either navigate to the CreatePostScreen 
+          // or just open it as a full-screen modal
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const CreatePostScreen()));
+        },
         backgroundColor: AppTheme.neonPink,
         child: const Icon(Icons.add, color: Colors.white, size: 32),
       ),
@@ -41,7 +47,7 @@ class _MainScaffoldState extends State<MainScaffold> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) {
-          if (index == 2) return; // Ignore clicks on the placeholder
+          if (index == 2) return; // Prevent clicking the middle empty slot
           setState(() => _currentIndex = index);
         },
         type: BottomNavigationBarType.fixed,
@@ -53,7 +59,7 @@ class _MainScaffoldState extends State<MainScaffold> {
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.location_on_outlined), activeIcon: Icon(Icons.location_on), label: 'Discover'),
           BottomNavigationBarItem(icon: Icon(Icons.local_fire_department_outlined), activeIcon: Icon(Icons.local_fire_department), label: 'Dares'),
-          BottomNavigationBarItem(icon: SizedBox(height: 20), label: ''), // Spacer
+          BottomNavigationBarItem(icon: SizedBox(height: 20), label: ''), // Empty slot for FAB
           BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline), activeIcon: Icon(Icons.chat_bubble), label: 'Messages'),
           BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: 'Profile'),
         ],
