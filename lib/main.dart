@@ -26,12 +26,10 @@ class QivizApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final goRouter = ref.watch(appRouterProvider);
-
     return MaterialApp.router(
       title: 'Qiviz',
       theme: AppTheme.darkTheme,
-      routerConfig: goRouter,
+      routerConfig: AppRouter.router,
       debugShowCheckedModeBanner: false,
     );
   }

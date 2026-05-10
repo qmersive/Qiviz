@@ -23,16 +23,58 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   final TextEditingController _searchController = TextEditingController();
 
+  int _unreadCount = 0;
+  late RealtimeChannel _notificationChannel;
+
   @override
   void initState() {
     super.initState();
     _fetchData();
+    _setupNotificationListener();
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _notificationChannel.unsubscribe();
     super.dispose();
+  }
+
+  void _setupNotificationListener() {
+    final myId = _supabase.auth.currentUser?.id;
+    _notificationChannel = _supabase.channel('public:notifications').onPostgresChanges(
+      event: PostgresChangeEvent.insert,
+      schema: 'public',
+      table: 'notifications',
+      callback: (payload) {
+        final newNotif = payload.newRecord;
+        if (newNotif['user_id'] == myId) {
+          if (mounted) {
+            setState(() => _unreadCount++);
+            _showLiveAlert(newNotif['title'], newNotif['message']);
+          }
+        }
+      },
+    ).subscribe();
+  }
+
+  void _showLiveAlert(String title, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.electricBlue)),
+            Text(message, style: const TextStyle(fontSize: 12)),
+          ],
+        ),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: AppTheme.surfaceDark,
+        margin: const EdgeInsets.only(top: 10, left: 10, right: 10),
+        duration: const Duration(seconds: 4),
+      ),
+    );
   }
 
   Future<void> _fetchData() async {
@@ -103,7 +145,23 @@ class _HomeScreenState extends State<HomeScreen> {
             shaderCallback: (bounds) => AppTheme.primaryGradient.createShader(bounds),
             child: Text('Discover', style: GoogleFonts.outfit(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white)),
           ),
-          IconButton(icon: const Icon(Icons.notifications_none, color: AppTheme.electricBlue), onPressed: () {}),
+          Stack(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications_none, color: AppTheme.electricBlue),
+                onPressed: () => setState(() => _unreadCount = 0),
+              ),
+              if (_unreadCount > 0)
+                Positioned(
+                  right: 8, top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                    child: Text('$_unreadCount', style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+            ],
+          ),
         ],
       ),
     );

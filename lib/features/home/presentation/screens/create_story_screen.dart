@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -14,28 +13,38 @@ class CreateStoryScreen extends StatefulWidget {
 }
 
 class _CreateStoryScreenState extends State<CreateStoryScreen> {
-  File? _imageFile;
+  XFile? _pickedImage;
   bool _isUploading = false;
   final _picker = ImagePicker();
 
   Future<void> _pickImage() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-    if (image != null) {
-      setState(() => _imageFile = File(image.path));
+    try {
+      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+      if (image != null) {
+        setState(() => _pickedImage = image);
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 
   Future<void> _uploadStory() async {
-    if (_imageFile == null) return;
+    if (_pickedImage == null) return;
     setState(() => _isUploading = true);
 
     try {
       final supabase = Supabase.instance.client;
       final user = supabase.auth.currentUser;
-      final fileName = '${user?.id}_${DateTime.now().millisecondsSinceEpoch}${p.extension(_imageFile!.path)}';
+      final fileName = '${user?.id}_${DateTime.now().millisecondsSinceEpoch}${p.extension(_pickedImage!.name)}';
       final path = 'stories/$fileName';
 
-      await supabase.storage.from('media').upload(path, _imageFile!);
+      final bytes = await _pickedImage!.readAsBytes();
+      await supabase.storage.from('media').uploadBinary(
+        path, 
+        bytes,
+        fileOptions: const FileOptions(contentType: 'image/jpeg'),
+      );
+      
       final imageUrl = supabase.storage.from('media').getPublicUrl(path);
 
       await supabase.from('stories').insert({
@@ -48,7 +57,7 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Story posted! ✨')));
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to post story: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
     } finally {
       if (mounted) setState(() => _isUploading = false);
     }
@@ -60,8 +69,8 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          if (_imageFile != null)
-            Positioned.fill(child: Image.file(_imageFile!, fit: BoxFit.cover)),
+          if (_pickedImage != null)
+            Positioned.fill(child: Image.network(_pickedImage!.path, fit: BoxFit.cover)),
           
           SafeArea(
             child: Column(
@@ -70,12 +79,12 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     IconButton(icon: const Icon(Icons.close, color: Colors.white), onPressed: () => Navigator.pop(context)),
-                    if (_imageFile != null)
+                    if (_pickedImage != null)
                       TextButton(onPressed: _isUploading ? null : _uploadStory, child: const Text('Post', style: TextStyle(color: AppTheme.electricBlue, fontWeight: FontWeight.bold))),
                   ],
                 ),
                 const Spacer(),
-                if (_imageFile == null)
+                if (_pickedImage == null)
                   Center(
                     child: Column(
                       children: [

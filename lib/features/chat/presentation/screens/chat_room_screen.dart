@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:qiviz/core/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:animate_do/animate_do.dart';
@@ -13,44 +14,97 @@ class ChatRoomScreen extends StatefulWidget {
 }
 
 class _ChatRoomScreenState extends State<ChatRoomScreen> {
+  final _supabase = Supabase.instance.client;
   final TextEditingController _messageController = TextEditingController();
-  final List<Map<String, dynamic>> _messages = [
-    {'text': 'Hey! I saw your dare video, so cool! 🔥', 'isMe': false},
-  ];
+  List<Map<String, dynamic>> _messages = [];
+  bool _isLoading = true;
+  late RealtimeChannel _channel;
 
-  final List<String> _aiResponses = [
-    "That's interesting! Tell me more about your interests. 😊",
-    "I love your vibe! Ready to start a practice date? 🤖",
-    "Did you know that cross-cultural friendships are the best? 🌍",
-    "You should check out the latest viral dare, it matches your profile! 🔥",
-    "I can help you break the ice with new matches. Just ask! 🧊",
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _fetchMessages();
+    _setupRealtime();
+  }
 
-  void _sendMessage() {
-    if (_messageController.text.trim().isEmpty) return;
-    final userText = _messageController.text.trim();
-    
-    setState(() {
-      _messages.add({
-        'text': userText,
-        'isMe': true,
-      });
-    });
-    _messageController.clear();
-    
-    // Smart AI Logic
-    if (widget.chatData['username'] == 'qumersive_ai' || widget.chatData['name'].contains('AI')) {
-      Future.delayed(const Duration(seconds: 1), () {
-        if (mounted) {
-          setState(() {
-            _messages.add({
-              'text': _aiResponses[Random().nextInt(_aiResponses.length)],
-              'isMe': false,
-            });
-          });
-        }
-      });
+  @override
+  void dispose() {
+    _channel.unsubscribe();
+    _messageController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchMessages() async {
+    try {
+      final myId = _supabase.auth.currentUser?.id;
+      final otherId = widget.chatData['id'];
+
+      final response = await _supabase
+          .from('messages')
+          .select()
+          .or('and(sender_id.eq.$myId,receiver_id.eq.$otherId),and(sender_id.eq.$otherId,receiver_id.eq.$myId)')
+          .order('created_at', ascending: true);
+
+      if (mounted) {
+        setState(() {
+          _messages = List<Map<String, dynamic>>.from(response);
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _setupRealtime() {
+    final myId = _supabase.auth.currentUser?.id;
+    _channel = _supabase.channel('public:messages').onPostgresChanges(
+      event: PostgresChangeEvent.insert,
+      schema: 'public',
+      table: 'messages',
+      callback: (payload) {
+        final newMsg = payload.newRecord;
+        if ((newMsg['sender_id'] == myId && newMsg['receiver_id'] == widget.chatData['id']) ||
+            (newMsg['sender_id'] == widget.chatData['id'] && newMsg['receiver_id'] == myId)) {
+          if (mounted) {
+            setState(() => _messages.add(Map<String, dynamic>.from(newMsg)));
+          }
+        }
+      },
+    ).subscribe();
+  }
+
+  Future<void> _sendMessage() async {
+    if (_messageController.text.trim().isEmpty) return;
+    final text = _messageController.text.trim();
+    _messageController.clear();
+
+    try {
+      final myId = _supabase.auth.currentUser?.id;
+      await _supabase.from('messages').insert({
+        'sender_id': myId,
+        'receiver_id': widget.chatData['id'],
+        'text': text,
+      });
+
+      // Simple AI logic for AI profile
+      if (widget.chatData['name'].contains('AI') || widget.chatData['username'] == 'qumersive_ai') {
+        Future.delayed(const Duration(seconds: 1), () {
+          _sendAiResponse();
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to send: $e')));
+    }
+  }
+
+  void _sendAiResponse() async {
+    final responses = ["That's interesting!", "I love your energy!", "Tell me more!", "Ready for a date?"];
+    await _supabase.from('messages').insert({
+      'sender_id': widget.chatData['id'],
+      'receiver_id': _supabase.auth.currentUser?.id,
+      'text': responses[Random().nextInt(responses.length)],
+    });
   }
 
   void _addEmoji(String emoji) {
@@ -63,54 +117,43 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       backgroundColor: AppTheme.darkBackground,
       appBar: AppBar(
         backgroundColor: AppTheme.surfaceDark,
-        elevation: 0,
         title: Row(
           children: [
             CircleAvatar(
-              backgroundColor: AppTheme.electricBlue,
               backgroundImage: widget.chatData['profile_photo_url'] != null ? NetworkImage(widget.chatData['profile_photo_url']) : null,
               child: widget.chatData['profile_photo_url'] == null ? Text(widget.chatData['name'][0]) : null,
             ),
             const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(widget.chatData['name'], style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-                const Text('Online', style: TextStyle(fontSize: 12, color: AppTheme.acidGreen)),
-              ],
-            ),
+            Text(widget.chatData['name'], style: GoogleFonts.outfit(fontSize: 18, color: Colors.white)),
           ],
         ),
-        actions: [
-          IconButton(icon: const Icon(Icons.videocam, color: AppTheme.neonPink), onPressed: () {}),
-        ],
       ),
       body: Column(
         children: [
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(20),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final msg = _messages[index];
-                return FadeInUp(
-                  duration: const Duration(milliseconds: 300),
-                  child: Align(
-                    alignment: msg['isMe'] ? Alignment.centerRight : Alignment.centerLeft,
-                    child: Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                        gradient: msg['isMe'] ? AppTheme.primaryGradient : null,
-                        color: msg['isMe'] ? null : AppTheme.surfaceDark,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(msg['text'], style: const TextStyle(color: Colors.white)),
-                    ),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _messages.length,
+                    itemBuilder: (context, index) {
+                      final msg = _messages[index];
+                      final isMe = msg['sender_id'] == _supabase.auth.currentUser?.id;
+                      return Align(
+                        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          decoration: BoxDecoration(
+                            gradient: isMe ? AppTheme.primaryGradient : null,
+                            color: isMe ? null : AppTheme.surfaceDark,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Text(msg['text'], style: const TextStyle(color: Colors.white)),
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
           ),
           _buildEmojiBar(),
           _buildInput(),
@@ -122,17 +165,15 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   Widget _buildEmojiBar() {
     final emojis = ['🔥', '❤️', '😂', '🌍', '🤔', '🙌', '✨', '🤖'];
     return Container(
-      height: 40,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
+      height: 44,
+      color: AppTheme.surfaceDark.withValues(alpha: 0.5),
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
         itemCount: emojis.length,
-        itemBuilder: (context, index) => GestureDetector(
-          onTap: () => _addEmoji(emojis[index]),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Text(emojis[index], style: const TextStyle(fontSize: 24)),
-          ),
+        itemBuilder: (context, index) => IconButton(
+          onPressed: () => _addEmoji(emojis[index]),
+          icon: Text(emojis[index], style: const TextStyle(fontSize: 22)),
         ),
       ),
     );
@@ -140,32 +181,28 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
   Widget _buildInput() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      padding: const EdgeInsets.all(16),
       color: AppTheme.surfaceDark,
       child: SafeArea(
         child: Row(
           children: [
-            IconButton(icon: const Icon(Icons.mic, color: AppTheme.textGrey), onPressed: () {}),
             Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(color: AppTheme.darkBackground, borderRadius: BorderRadius.circular(30)),
-                child: TextField(
-                  controller: _messageController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(hintText: 'Type a message...', hintStyle: TextStyle(color: Colors.grey), border: InputBorder.none),
-                  onSubmitted: (_) => _sendMessage(),
+              child: TextField(
+                controller: _messageController,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'Type a message...',
+                  hintStyle: const TextStyle(color: AppTheme.textGrey),
+                  filled: true,
+                  fillColor: AppTheme.darkBackground,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
                 ),
               ),
             ),
             const SizedBox(width: 12),
-            GestureDetector(
-              onTap: _sendMessage,
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: const BoxDecoration(gradient: AppTheme.viralGradient, shape: BoxShape.circle),
-                child: const Icon(Icons.send, color: Colors.white, size: 20),
-              ),
+            IconButton(
+              icon: const Icon(Icons.send, color: AppTheme.electricBlue),
+              onPressed: _sendMessage,
             ),
           ],
         ),

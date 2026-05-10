@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -16,20 +15,24 @@ class CreatePostScreen extends StatefulWidget {
 class _CreatePostScreenState extends State<CreatePostScreen> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
-  File? _videoFile;
+  XFile? _pickedVideo;
   bool _isUploading = false;
   final _picker = ImagePicker();
 
   Future<void> _pickVideo() async {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Opening Gallery...'), duration: Duration(seconds: 1)));
-    final XFile? video = await _picker.pickVideo(source: ImageSource.gallery);
-    if (video != null) {
-      setState(() => _videoFile = File(video.path));
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Opening Gallery...'), duration: Duration(seconds: 1)));
+      final XFile? video = await _picker.pickVideo(source: ImageSource.gallery);
+      if (video != null) {
+        setState(() => _pickedVideo = video);
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error picking video: $e')));
     }
   }
 
   Future<void> _uploadPost() async {
-    if (_videoFile == null || _titleController.text.isEmpty) {
+    if (_pickedVideo == null || _titleController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a video and add a title!')));
       return;
     }
@@ -39,14 +42,21 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     try {
       final supabase = Supabase.instance.client;
       final user = supabase.auth.currentUser;
-      final fileName = '${user?.id}_${DateTime.now().millisecondsSinceEpoch}${p.extension(_videoFile!.path)}';
+
+      final fileName = '${user?.id}_${DateTime.now().millisecondsSinceEpoch}${p.extension(_pickedVideo!.name)}';
       final path = 'dares/$fileName';
 
-      // 1. Upload to Storage (Make sure 'media' bucket exists and is public)
-      await supabase.storage.from('media').upload(path, _videoFile!);
+      // Use bytes for web compatibility
+      final bytes = await _pickedVideo!.readAsBytes();
+      
+      await supabase.storage.from('media').uploadBinary(
+        path, 
+        bytes,
+        fileOptions: const FileOptions(contentType: 'video/mp4'),
+      );
+      
       final videoUrl = supabase.storage.from('media').getPublicUrl(path);
 
-      // 2. Insert into DB (Using creator_id to match schema.sql)
       await supabase.from('dares').insert({
         'creator_id': user?.id,
         'title': _titleController.text,
@@ -61,7 +71,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         Navigator.pop(context);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: Ensure "media" bucket exists in Supabase. Error: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
     } finally {
       if (mounted) setState(() => _isUploading = false);
     }
@@ -91,7 +101,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: AppTheme.electricBlue.withValues(alpha: 0.3)),
                 ),
-                child: _videoFile == null
+                child: _pickedVideo == null
                     ? Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -109,19 +119,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: 'Dare Title',
-                hintStyle: const TextStyle(color: AppTheme.textGrey),
-                filled: true,
-                fillColor: AppTheme.surfaceDark,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _descriptionController,
-              style: const TextStyle(color: Colors.white),
-              maxLines: 3,
-              decoration: InputDecoration(
-                hintText: 'Tell us more about this challenge...',
                 hintStyle: const TextStyle(color: AppTheme.textGrey),
                 filled: true,
                 fillColor: AppTheme.surfaceDark,
