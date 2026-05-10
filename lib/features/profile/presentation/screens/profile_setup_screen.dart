@@ -221,6 +221,16 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Center(
+            child: FadeInDown(
+              child: Image.asset(
+                'assets/images/qiviz.png',
+                width: 80,
+                height: 80,
+              ),
+            ),
+          ),
+          const SizedBox(height: 32),
           FadeInDown(child: Text('Who are you? 🎉', style: GoogleFonts.outfit(fontSize: 32, fontWeight: FontWeight.bold, color: AppTheme.neonPink))),
           const SizedBox(height: 12),
           FadeInUp(delay: const Duration(milliseconds: 200), child: Text('Pick a unique username so people can find you.', style: GoogleFonts.inter(fontSize: 16, color: AppTheme.textGrey))),

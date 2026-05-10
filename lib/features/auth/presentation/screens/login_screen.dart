@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qiviz/core/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:animate_do/animate_do.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -90,14 +91,12 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                'Qiviz',
-                style: GoogleFonts.outfit(
-                  fontSize: 48,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.electricBlue,
+              FadeInDown(
+                child: Image.asset(
+                  'assets/images/qiviz.png',
+                  width: 120,
+                  height: 120,
                 ),
-                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:qiviz/core/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:animate_do/animate_do.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -66,23 +67,29 @@ class _SplashScreenState extends State<SplashScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Logo placeholder or animated text
-              Text(
-                'Qiviz',
-                style: GoogleFonts.outfit(
-                  fontSize: 64,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.electricBlue,
-                  letterSpacing: -2,
+              FadeInDown(
+                duration: const Duration(seconds: 2),
+                child: Image.asset(
+                  'assets/images/qiviz.png',
+                  width: 150,
+                  height: 150,
                 ),
               ),
-              const SizedBox(height: 16),
-              Text(
-                'Connect. Play. Vibe.',
-                style: GoogleFonts.outfit(
-                  fontSize: 18,
-                  color: AppTheme.textGrey,
-                  letterSpacing: 2,
+              const SizedBox(height: 24),
+              FadeInUp(
+                duration: const Duration(seconds: 2),
+                child: ShaderMask(
+                  shaderCallback: (bounds) =>
+                      AppTheme.primaryGradient.createShader(bounds),
+                  child: Text(
+                    'QIVIZ',
+                    style: GoogleFonts.outfit(
+                      fontSize: 48,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 4,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 48),
