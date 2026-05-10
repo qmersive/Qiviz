@@ -33,13 +33,18 @@ class _MainScaffoldState extends State<MainScaffold> {
         index: _currentIndex,
         children: _screens,
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // Open the upload screen as a full-screen modal
-          Navigator.push(context, MaterialPageRoute(builder: (context) => const CreatePostScreen()));
-        },
-        backgroundColor: AppTheme.neonPink,
-        child: const Icon(Icons.add, color: Colors.white, size: 32),
+      floatingActionButton: Container(
+        height: 70, width: 70,
+        margin: const EdgeInsets.only(top: 10),
+        child: FloatingActionButton(
+          onPressed: () {
+            Navigator.push(context, MaterialPageRoute(builder: (context) => const CreatePostScreen()));
+          },
+          backgroundColor: AppTheme.neonPink,
+          elevation: 10,
+          tooltip: 'Post a Reel',
+          child: const Icon(Icons.add, color: Colors.white, size: 36),
+        ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: BottomNavigationBar(

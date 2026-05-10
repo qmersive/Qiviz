@@ -21,6 +21,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   final _picker = ImagePicker();
 
   Future<void> _pickVideo() async {
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Opening Gallery...'), duration: Duration(seconds: 1)));
     final XFile? video = await _picker.pickVideo(source: ImageSource.gallery);
     if (video != null) {
       setState(() => _videoFile = File(video.path));
@@ -79,8 +80,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            GestureDetector(
+            InkWell(
               onTap: _pickVideo,
+              borderRadius: BorderRadius.circular(20),
               child: Container(
                 width: double.infinity,
                 height: 300,
@@ -95,7 +97,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                         children: [
                           const Icon(Icons.video_call, size: 64, color: AppTheme.electricBlue),
                           const SizedBox(height: 12),
-                          Text('Upload Video', style: GoogleFonts.outfit(color: AppTheme.textGrey)),
+                          Text('Tap to Choose Video', style: GoogleFonts.outfit(color: AppTheme.textGrey)),
                         ],
                       )
                     : const Center(child: Icon(Icons.check_circle, size: 64, color: Colors.green)),

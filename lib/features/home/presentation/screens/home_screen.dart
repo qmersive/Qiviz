@@ -135,25 +135,37 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildMyStory() {
-    return GestureDetector(
-      onTap: () async {
-        final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => const CreateStoryScreen()));
-        if (result == true) _fetchData();
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Column(
-          children: [
-            Stack(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () async {
+              final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => const CreateStoryScreen()));
+              if (result == true) _fetchData();
+            },
+            borderRadius: BorderRadius.circular(40),
+            child: Stack(
               children: [
-                const CircleAvatar(radius: 32, backgroundColor: AppTheme.surfaceDark, child: Icon(Icons.add, color: Colors.white)),
-                Positioned(bottom: 0, right: 0, child: Container(padding: const EdgeInsets.all(4), decoration: const BoxDecoration(color: AppTheme.neonPink, shape: BoxShape.circle), child: const Icon(Icons.add, size: 12, color: Colors.white))),
+                Container(
+                  width: 64, height: 64,
+                  decoration: const BoxDecoration(shape: BoxShape.circle, color: AppTheme.surfaceDark),
+                  child: const Icon(Icons.add, color: Colors.white, size: 30),
+                ),
+                Positioned(
+                  bottom: 0, right: 0, 
+                  child: Container(
+                    padding: const EdgeInsets.all(4), 
+                    decoration: const BoxDecoration(color: AppTheme.neonPink, shape: BoxShape.circle), 
+                    child: const Icon(Icons.add, size: 12, color: Colors.white)
+                  )
+                ),
               ],
             ),
-            const SizedBox(height: 4),
-            const Text('Your Story', style: TextStyle(color: AppTheme.textGrey, fontSize: 10)),
-          ],
-        ),
+          ),
+          const SizedBox(height: 4),
+          const Text('Your Story', style: TextStyle(color: AppTheme.textGrey, fontSize: 10)),
+        ],
       ),
     );
   }
