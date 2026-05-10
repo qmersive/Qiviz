@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:go_router/go_router.dart';
+import 'package:qiviz/features/home/presentation/screens/create_story_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -21,18 +22,15 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> _suggestions = [];
   bool _isLoading = true;
   final TextEditingController _searchController = TextEditingController();
-  RealtimeChannel? _inviteSubscription;
 
   @override
   void initState() {
     super.initState();
     _fetchData();
-    _listenForInvites();
   }
 
   @override
   void dispose() {
-    _inviteSubscription?.unsubscribe();
     _searchController.dispose();
     super.dispose();
   }
@@ -40,12 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _fetchData() async {
     try {
       final currentUserId = _supabase.auth.currentUser?.id;
-      final response = await _supabase
-          .from('profiles')
-          .select()
-          .neq('id', currentUserId ?? '')
-          .eq('is_onboarded', true);
-
+      final response = await _supabase.from('profiles').select().neq('id', currentUserId ?? '').eq('is_onboarded', true);
       final data = List<Map<String, dynamic>>.from(response);
       setState(() {
         _users = data;
@@ -64,92 +57,11 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     setState(() {
       _suggestions = _users.where((user) {
-        final name = (user['name'] ?? '').toString().toLowerCase();
-        final username = (user['username'] ?? '').toString().toLowerCase();
+        final name = (user['name'] ?? '').toLowerCase();
+        final username = (user['username'] ?? '').toLowerCase();
         return name.contains(query.toLowerCase()) || username.contains(query.toLowerCase());
       }).toList();
     });
-  }
-
-  void _listenForInvites() {
-    final currentUserId = _supabase.auth.currentUser?.id;
-    if (currentUserId == null) return;
-
-    _inviteSubscription = _supabase
-        .channel('public:live_sessions')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.insert,
-          schema: 'public',
-          table: 'live_sessions',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'guest_id',
-            value: currentUserId,
-          ),
-          callback: (payload) {
-            final data = payload.newRecord;
-            if (data['status'] == 'waiting') {
-              _showInviteDialog(data);
-            }
-          },
-        )
-        .subscribe();
-  }
-
-  void _showInviteDialog(Map<String, dynamic> session) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.surfaceDark,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Text('Game Invite! 🎮', style: GoogleFonts.outfit(color: AppTheme.textWhite)),
-        content: const Text('Someone wants to play a cultural trivia game with you live!', style: TextStyle(color: AppTheme.textGrey)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Decline', style: TextStyle(color: AppTheme.neonPink)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              context.push('/game', extra: {
-                'name': 'Friend', 
-                'channel': session['channel_name'],
-              });
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.electricBlue),
-            child: const Text('Join Now'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _sendInvite(Map<String, dynamic> targetUser) async {
-    final currentUserId = _supabase.auth.currentUser?.id;
-    final channelName = 'room_${currentUserId}_${targetUser['id']}';
-
-    try {
-      await _supabase.from('live_sessions').insert({
-        'host_id': currentUserId,
-        'guest_id': targetUser['id'],
-        'channel_name': channelName,
-        'status': 'waiting',
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Invite sent to ${targetUser['name']}! 🚀')),
-        );
-        context.push('/game', extra: {
-          'name': targetUser['name'],
-          'channel': channelName,
-        });
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not send invite.')));
-    }
   }
 
   @override
@@ -162,14 +74,15 @@ class _HomeScreenState extends State<HomeScreen> {
             Column(
               children: [
                 _buildHeader(),
-                _buildOnlineSection(),
+                _buildStories(),
+                _buildBlindDateBanner(),
                 _buildSearchBar(),
                 Expanded(
                   child: _isLoading
                       ? const Center(child: CircularProgressIndicator(color: AppTheme.electricBlue))
                       : _users.isEmpty
-                          ? _buildEmptyState()
-                          : _buildSwipeStack(_users),
+                          ? const Center(child: Text('No users nearby.', style: TextStyle(color: AppTheme.textGrey)))
+                          : _buildSwipeStack(),
                 ),
               ],
             ),
@@ -186,28 +99,17 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ShaderMask(
-                shaderCallback: (bounds) => AppTheme.primaryGradient.createShader(bounds),
-                child: Text('Discover', style: GoogleFonts.outfit(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white)),
-              ),
-              Text('Connect across cultures', style: GoogleFonts.inter(color: AppTheme.textGrey)),
-            ],
+          ShaderMask(
+            shaderCallback: (bounds) => AppTheme.primaryGradient.createShader(bounds),
+            child: Text('Discover', style: GoogleFonts.outfit(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white)),
           ),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: AppTheme.surfaceDark, borderRadius: BorderRadius.circular(12)),
-            child: const Icon(Icons.notifications_none, color: AppTheme.electricBlue),
-          ),
+          IconButton(icon: const Icon(Icons.notifications_none, color: AppTheme.electricBlue), onPressed: () {}),
         ],
       ),
     );
   }
 
-  Widget _buildOnlineSection() {
-    if (_onlineUsers.isEmpty) return const SizedBox.shrink();
+  Widget _buildStories() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -216,40 +118,15 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Text('Live Now 🟢', style: GoogleFonts.outfit(color: AppTheme.acidGreen, fontWeight: FontWeight.bold)),
         ),
         SizedBox(
-          height: 100,
+          height: 110,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: _onlineUsers.length,
+            itemCount: _onlineUsers.length + 1,
             itemBuilder: (context, index) {
-              final user = _onlineUsers[index];
-              return GestureDetector(
-                onTap: () => _sendInvite(user),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Column(
-                    children: [
-                      Stack(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: const BoxDecoration(shape: BoxShape.circle, gradient: AppTheme.primaryGradient),
-                            child: CircleAvatar(
-                              radius: 30,
-                              backgroundColor: AppTheme.surfaceDark,
-                              backgroundImage: user['profile_photo_url'] != null ? NetworkImage(user['profile_photo_url']) : null,
-                              child: user['profile_photo_url'] == null ? Text(user['name'][0]) : null,
-                            ),
-                          ),
-                          Positioned(right: 2, bottom: 2, child: Container(width: 14, height: 14, decoration: BoxDecoration(color: AppTheme.acidGreen, shape: BoxShape.circle, border: Border.all(color: AppTheme.darkBackground, width: 2)))),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(user['username'] ?? '', style: const TextStyle(color: AppTheme.textWhite, fontSize: 10)),
-                    ],
-                  ),
-                ),
-              );
+              if (index == 0) return _buildMyStory();
+              final user = _onlineUsers[index - 1];
+              return _buildUserStory(user);
             },
           ),
         ),
@@ -257,22 +134,98 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildMyStory() {
+    return GestureDetector(
+      onTap: () async {
+        final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => const CreateStoryScreen()));
+        if (result == true) _fetchData();
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Column(
+          children: [
+            Stack(
+              children: [
+                const CircleAvatar(radius: 32, backgroundColor: AppTheme.surfaceDark, child: Icon(Icons.add, color: Colors.white)),
+                Positioned(bottom: 0, right: 0, child: Container(padding: const EdgeInsets.all(4), decoration: const BoxDecoration(color: AppTheme.neonPink, shape: BoxShape.circle), child: const Icon(Icons.add, size: 12, color: Colors.white))),
+              ],
+            ),
+            const SizedBox(height: 4),
+            const Text('Your Story', style: TextStyle(color: AppTheme.textGrey, fontSize: 10)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUserStory(Map<String, dynamic> user) {
+    return GestureDetector(
+      onTap: () => context.push('/chat', extra: user),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(3),
+              decoration: const BoxDecoration(shape: BoxShape.circle, gradient: AppTheme.primaryGradient),
+              child: CircleAvatar(
+                radius: 30,
+                backgroundColor: AppTheme.surfaceDark,
+                backgroundImage: user['profile_photo_url'] != null ? NetworkImage(user['profile_photo_url']) : null,
+                child: user['profile_photo_url'] == null ? Text(user['name'][0]) : null,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(user['username'] ?? '', style: const TextStyle(color: AppTheme.textWhite, fontSize: 10)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBlindDateBanner() {
+    return FadeInRight(
+      child: GestureDetector(
+        onTap: () => context.push('/blind-date'),
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: AppTheme.viralGradient,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [BoxShadow(color: AppTheme.neonPink.withValues(alpha: 0.3), blurRadius: 15)],
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.favorite, color: Colors.white, size: 40),
+              const SizedBox(width: 20),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Join Blind Date', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+                    const Text('Match anonymously with vibes!', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_forward_ios, color: Colors.white, size: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildSearchBar() {
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        decoration: BoxDecoration(color: AppTheme.surfaceDark.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(16)),
+        decoration: BoxDecoration(color: AppTheme.surfaceDark, borderRadius: BorderRadius.circular(16)),
         child: TextField(
           controller: _searchController,
           onChanged: _onSearchChanged,
-          style: const TextStyle(color: AppTheme.textWhite),
-          decoration: const InputDecoration(
-            hintText: 'Search students...',
-            hintStyle: TextStyle(color: AppTheme.textGrey),
-            border: InputBorder.none,
-            icon: Icon(Icons.search, color: AppTheme.electricBlue),
-          ),
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(hintText: 'Search new friends...', prefixIcon: Icon(Icons.search, color: AppTheme.electricBlue), border: InputBorder.none, contentPadding: EdgeInsets.symmetric(vertical: 15)),
         ),
       ),
     );
@@ -280,23 +233,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildSearchSuggestions() {
     return Positioned(
-      top: 200, left: 24, right: 24,
+      top: 240, left: 24, right: 24,
       child: Container(
         constraints: const BoxConstraints(maxHeight: 300),
-        decoration: BoxDecoration(color: AppTheme.surfaceDark, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 20)]),
+        decoration: BoxDecoration(color: AppTheme.surfaceDark, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black54, blurRadius: 10)]),
         child: ListView.builder(
           shrinkWrap: true,
           itemCount: _suggestions.length,
           itemBuilder: (context, index) {
             final user = _suggestions[index];
             return ListTile(
-              leading: CircleAvatar(child: Text(user['name'][0])),
+              leading: CircleAvatar(backgroundImage: user['profile_photo_url'] != null ? NetworkImage(user['profile_photo_url']) : null),
               title: Text(user['name'], style: const TextStyle(color: Colors.white)),
-              subtitle: Text('@${user['username']}', style: const TextStyle(color: AppTheme.electricBlue)),
               onTap: () {
                 _searchController.clear();
                 setState(() => _suggestions = []);
-                _sendInvite(user);
+                context.push('/chat', extra: user);
               },
             );
           },
@@ -305,22 +257,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildSwipeStack(List<Map<String, dynamic>> users) {
+  Widget _buildSwipeStack() {
     return CardSwiper(
       controller: _controller,
-      numberOfCardsDisplayed: users.length < 3 ? users.length : 3,
-      onSwipe: _handleSwipe,
-      cards: users.map((u) => _buildUserCard(u)).toList(),
+      numberOfCardsDisplayed: _users.length < 3 ? _users.length : 3,
+      cards: _users.map((u) => _buildUserCard(u)).toList(),
     );
-  }
-
-  bool _handleSwipe(int index, CardSwiperDirection direction) {
-    if (direction == CardSwiperDirection.right) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Matched with ${_users[index]['name']}! 💖')),
-      );
-    }
-    return true;
   }
 
   Widget _buildUserCard(Map<String, dynamic> user) {
@@ -337,36 +279,27 @@ class _HomeScreenState extends State<HomeScreen> {
             Positioned(
               bottom: 0, left: 0, right: 0,
               child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Colors.black.withValues(alpha: 0.8)])),
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Colors.black87])),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(user['name'] ?? '', style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.textWhite)),
-                    Text('@${user['username'] ?? ''}', style: const TextStyle(color: AppTheme.electricBlue)),
-                    const SizedBox(height: 12),
+                    Text(user['name'], style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
+                    Text('@${user['username']}', style: const TextStyle(color: AppTheme.electricBlue)),
+                    const SizedBox(height: 16),
                     Row(
                       children: [
                         ElevatedButton.icon(
-                          onPressed: () => _sendInvite(user),
-                          icon: const Icon(Icons.videocam, size: 18),
-                          label: const Text('Invite to Game'),
+                          onPressed: () => context.push('/game', extra: user),
+                          icon: const Icon(Icons.videocam),
+                          label: const Text('Play Game'),
                           style: ElevatedButton.styleFrom(backgroundColor: AppTheme.neonPink, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
                         ),
-                        if (user['is_streaming'] == true) ...[
-                          const SizedBox(width: 8),
-                          ElevatedButton.icon(
-                            onPressed: () {
-                              context.push('/game', extra: {
-                                'name': user['name'],
-                                'channel': 'room_${user['id']}',
-                              });
-                            },
-                            icon: const Icon(Icons.live_tv, size: 18),
-                            label: const Text('Join Live'),
-                            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.electricBlue, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                          ),
-                        ],
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
+                          onPressed: () => context.push('/chat', extra: user),
+                        ),
                       ],
                     ),
                   ],
@@ -378,6 +311,4 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-
-  Widget _buildEmptyState() => const Center(child: Text('No users found.', style: TextStyle(color: AppTheme.textGrey)));
 }

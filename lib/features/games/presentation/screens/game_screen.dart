@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'dart:math';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:qiviz/core/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:animate_do/animate_do.dart';
@@ -17,11 +20,12 @@ class GameScreen extends StatefulWidget {
 }
 
 class _GameScreenState extends State<GameScreen> {
-  int _currentQuestion = 0;
-  int _score = 0;
+  int _currentQuestionIndex = 0;
   bool _gameOver = false;
   int _timer = 15;
   Timer? _countdownTimer;
+  List<dynamic> _apiQuestions = [];
+  bool _isLoadingQuestions = true;
 
   // Agora State
   int? _remoteUid;
@@ -30,29 +34,51 @@ class _GameScreenState extends State<GameScreen> {
   late String _channelName;
 
   String _gameMode = 'trivia'; // 'trivia' or 'dare'
+  bool _showCaptions = false;
+  String _currentCaption = "";
   
-  final List<Map<String, dynamic>> _triviaQuestions = [
-    {'q': 'What is the most popular street food in your country?', 'type': 'icebreaker'},
-    {'q': 'Which festival is your absolute favorite?', 'type': 'culture'},
-    {'q': 'What is one thing people get wrong about your culture?', 'type': 'deep'},
-    {'q': 'If I visited your city, where is the first place you would take me?', 'type': 'travel'},
+  final List<String> _translatedCaptions = [
+    "नमस्ते, आप कैसे हैं? (Hello, how are you?)",
+    "मुझे आपकी संस्कृति बहुत पसंद है! (I really like your culture!)",
+    "क्या आप मुझे इस व्यंजन के बारे में बता सकते हैं? (Can you tell me about this dish?)",
+    "यह बहुत अच्छा खेल है! (This is a great game!)",
   ];
-
-  final List<Map<String, dynamic>> _dareQuestions = [
-    {'q': 'Sing the chorus of a popular song from your country!', 'type': 'dare'},
-    {'q': 'Show us a traditional dance move!', 'type': 'dare'},
-    {'q': 'Try to say "I love food" in my native language!', 'type': 'dare'},
-    {'q': 'Do 10 pushups while counting in your language!', 'type': 'dare'},
-  ];
-
-  List<Map<String, dynamic>> get _questions => _gameMode == 'trivia' ? _triviaQuestions : _dareQuestions;
 
   @override
   void initState() {
     super.initState();
     _channelName = widget.opponent['channel'] ?? "qiviz_general";
     initAgora();
-    _startTimer();
+    _fetchTrivia();
+    _startCaptionSimulation();
+  }
+
+  Future<void> _fetchTrivia() async {
+    try {
+      final response = await http.get(Uri.parse('https://opentdb.com/api.php?amount=10&type=boolean'));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (mounted) {
+          setState(() {
+            _apiQuestions = data['results'];
+            _isLoadingQuestions = false;
+            _startTimer();
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingQuestions = false);
+    }
+  }
+
+  void _startCaptionSimulation() {
+    Timer.periodic(const Duration(seconds: 4), (timer) {
+      if (mounted && _showCaptions) {
+        setState(() {
+          _currentCaption = _translatedCaptions[Random().nextInt(_translatedCaptions.length)];
+        });
+      }
+    });
   }
 
   @override
@@ -110,9 +136,9 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   void _nextQuestion() {
-    if (_currentQuestion < _questions.length - 1) {
+    if (_currentQuestionIndex < _apiQuestions.length - 1) {
       setState(() {
-        _currentQuestion++;
+        _currentQuestionIndex++;
         _startTimer();
       });
     } else {
@@ -129,7 +155,7 @@ class _GameScreenState extends State<GameScreen> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Background Video (Remote)
+          // Remote Video
           Positioned.fill(
             child: _remoteUid != null
                 ? AgoraVideoView(
@@ -141,14 +167,7 @@ class _GameScreenState extends State<GameScreen> {
                   )
                 : Container(
                     decoration: const BoxDecoration(gradient: AppTheme.primaryGradient),
-                    child: Center(child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const CircularProgressIndicator(color: Colors.white),
-                        const SizedBox(height: 16),
-                        Text('Waiting for ${widget.opponent['name']}...', style: const TextStyle(color: Colors.white)),
-                      ],
-                    )),
+                    child: const Center(child: CircularProgressIndicator(color: Colors.white)),
                   ),
           ),
 
@@ -157,23 +176,35 @@ class _GameScreenState extends State<GameScreen> {
             top: 60, right: 20,
             child: Container(
               width: 110, height: 150,
-              decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), border: Border.all(color: AppTheme.electricBlue, width: 2), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 10)]),
+              decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), border: Border.all(color: AppTheme.electricBlue, width: 2)),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(18),
-                child: _localUserJoined
-                    ? AgoraVideoView(controller: VideoViewController(rtcEngine: _engine, canvas: const VideoCanvas(uid: 0)))
-                    : const Center(child: CircularProgressIndicator()),
+                child: _localUserJoined ? AgoraVideoView(controller: VideoViewController(rtcEngine: _engine, canvas: const VideoCanvas(uid: 0))) : null,
               ),
             ),
           ),
 
-          // Game UI
+          // Captions
+          if (_showCaptions)
+            Positioned(
+              bottom: 140, left: 20, right: 20,
+              child: FadeInUp(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.7), borderRadius: BorderRadius.circular(16), border: Border.all(color: AppTheme.acidGreen.withValues(alpha: 0.3))),
+                  child: Text(_currentCaption, textAlign: TextAlign.center, style: GoogleFonts.inter(color: AppTheme.acidGreen, fontWeight: FontWeight.bold, fontSize: 16)),
+                ),
+              ),
+            ),
+
+          // UI
           SafeArea(
             child: Column(
               children: [
                 _buildHeader(),
                 const Spacer(),
-                if (!_gameOver) _buildQuestionCard(),
+                if (_isLoadingQuestions) const CircularProgressIndicator(color: AppTheme.neonPink),
+                if (!_isLoadingQuestions && !_gameOver) _buildQuestionCard(),
                 if (_gameOver) _buildGameOverCard(),
                 const SizedBox(height: 40),
                 _buildControls(),
@@ -197,14 +228,14 @@ class _GameScreenState extends State<GameScreen> {
             onTap: () {
               setState(() {
                 _gameMode = _gameMode == 'trivia' ? 'dare' : 'trivia';
-                _currentQuestion = 0;
+                _currentQuestionIndex = 0;
                 _startTimer();
               });
             },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(gradient: _gameMode == 'trivia' ? AppTheme.primaryGradient : AppTheme.viralGradient, borderRadius: BorderRadius.circular(20)),
-              child: Text(_gameMode == 'trivia' ? 'Get to Know 🌍' : 'Truth or Dare 🔥', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
+              child: Text(_gameMode == 'trivia' ? 'Live Trivia 🌍' : 'Truth or Dare 🔥', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           ),
           const SizedBox(width: 48),
@@ -214,37 +245,36 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   Widget _buildQuestionCard() {
-    final q = _questions[_currentQuestion];
+    final q = _apiQuestions[_currentQuestionIndex];
     return FadeInUp(
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 32),
         padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.7),
-          borderRadius: BorderRadius.circular(30),
-          border: Border.all(color: AppTheme.electricBlue.withValues(alpha: 0.3)),
-        ),
+        decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.7), borderRadius: BorderRadius.circular(30), border: Border.all(color: AppTheme.electricBlue.withValues(alpha: 0.3))),
         child: Column(
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.timer_outlined, color: AppTheme.neonPink, size: 20),
-                const SizedBox(width: 8),
-                Text('$_timer', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.neonPink)),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Text(q['q'], textAlign: TextAlign.center, style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
+            Text('Question #${_currentQuestionIndex + 1}', style: const TextStyle(color: AppTheme.textGrey, fontSize: 12)),
+            const SizedBox(height: 12),
+            Text(HtmlUnescape().convert(q['question']), textAlign: TextAlign.center, style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
             const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _nextQuestion,
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.electricBlue, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-              child: const Text('Next Question'),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _answerButton('TRUE', Colors.green),
+                _answerButton('FALSE', Colors.red),
+              ],
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _answerButton(String label, Color color) {
+    return ElevatedButton(
+      onPressed: _nextQuestion,
+      style: ElevatedButton.styleFrom(backgroundColor: color, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+      child: Text(label),
     );
   }
 
@@ -258,9 +288,9 @@ class _GameScreenState extends State<GameScreen> {
           children: [
             const Text('Match Ended! ✨', style: TextStyle(color: AppTheme.acidGreen, fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
-            const Text('You both earned +50 XP for sharing your culture!', textAlign: TextAlign.center, style: TextStyle(color: Colors.white)),
+            const Text('Great session! You both learned something new today.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white)),
             const SizedBox(height: 32),
-            ElevatedButton(onPressed: () => Navigator.pop(context), style: ElevatedButton.styleFrom(backgroundColor: AppTheme.neonPink), child: const Text('Back to Discover')),
+            ElevatedButton(onPressed: () => Navigator.pop(context), style: ElevatedButton.styleFrom(backgroundColor: AppTheme.neonPink), child: const Text('Back to Home')),
           ],
         ),
       ),
@@ -273,14 +303,20 @@ class _GameScreenState extends State<GameScreen> {
       children: [
         _circleIcon(Icons.mic, Colors.white24),
         const SizedBox(width: 20),
-        _circleIcon(Icons.videocam, Colors.white24),
+        GestureDetector(onTap: () => setState(() => _showCaptions = !_showCaptions), child: _circleIcon(Icons.translate, _showCaptions ? AppTheme.electricBlue : Colors.white24)),
         const SizedBox(width: 20),
-        _circleIcon(Icons.emoji_emotions, Colors.white24),
+        _circleIcon(Icons.videocam, Colors.white24),
       ],
     );
   }
 
   Widget _circleIcon(IconData icon, Color bg) {
     return Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: bg, shape: BoxShape.circle), child: Icon(icon, color: Colors.white, size: 28));
+  }
+}
+
+class HtmlUnescape {
+  String convert(String text) {
+    return text.replaceAll('&quot;', '"').replaceAll('&#039;', "'").replaceAll('&amp;', '&');
   }
 }

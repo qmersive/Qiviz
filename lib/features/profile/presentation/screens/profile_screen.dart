@@ -7,6 +7,7 @@ import 'package:qiviz/core/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:qiviz/features/profile/presentation/screens/edit_profile_screen.dart';
 import 'dart:io';
 
 class ProfileScreen extends StatefulWidget {
@@ -54,7 +55,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       final response = await _supabase
           .from('dares')
           .select()
-          .eq('user_id', user?.id ?? '')
+          .eq('creator_id', user?.id ?? '')
           .order('created_at', ascending: false);
       if (mounted) {
         setState(() => _myDares = response as List<dynamic>);
@@ -192,7 +193,13 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       children: [
         Expanded(
           child: ElevatedButton(
-            onPressed: () {},
+            onPressed: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => EditProfileScreen(profile: _profile!)),
+              );
+              if (result == true) _fetchProfile();
+            },
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.surfaceDark, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
             child: const Text('Edit Profile'),
           ),

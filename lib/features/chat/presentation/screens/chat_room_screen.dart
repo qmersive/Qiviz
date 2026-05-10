@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:qiviz/core/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:animate_do/animate_do.dart';
+import 'dart:math';
 
 class ChatRoomScreen extends StatefulWidget {
   final Map<String, dynamic> chatData;
@@ -15,32 +16,45 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   final TextEditingController _messageController = TextEditingController();
   final List<Map<String, dynamic>> _messages = [
     {'text': 'Hey! I saw your dare video, so cool! 🔥', 'isMe': false},
-    {'text': 'Haha thanks! You should try it too.', 'isMe': true},
+  ];
+
+  final List<String> _aiResponses = [
+    "That's interesting! Tell me more about your interests. 😊",
+    "I love your vibe! Ready to start a practice date? 🤖",
+    "Did you know that cross-cultural friendships are the best? 🌍",
+    "You should check out the latest viral dare, it matches your profile! 🔥",
+    "I can help you break the ice with new matches. Just ask! 🧊",
   ];
 
   void _sendMessage() {
     if (_messageController.text.trim().isEmpty) return;
+    final userText = _messageController.text.trim();
+    
     setState(() {
       _messages.add({
-        'text': _messageController.text.trim(),
+        'text': userText,
         'isMe': true,
       });
     });
     _messageController.clear();
     
-    // Simulate AI response if it's the Matchmaker
-    if (widget.chatData['isAI'] == true) {
+    // Smart AI Logic
+    if (widget.chatData['username'] == 'qumersive_ai' || widget.chatData['name'].contains('AI')) {
       Future.delayed(const Duration(seconds: 1), () {
         if (mounted) {
           setState(() {
             _messages.add({
-              'text': 'I love your vibe! Ready to start a practice date? 🤖',
+              'text': _aiResponses[Random().nextInt(_aiResponses.length)],
               'isMe': false,
             });
           });
         }
       });
     }
+  }
+
+  void _addEmoji(String emoji) {
+    _messageController.text += emoji;
   }
 
   @override
@@ -53,15 +67,16 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         title: Row(
           children: [
             CircleAvatar(
-              backgroundColor: widget.chatData['isAI'] == true ? AppTheme.electricBlue : AppTheme.primaryPurple,
-              child: Text(widget.chatData['name'][0], style: const TextStyle(color: Colors.white, fontSize: 14)),
+              backgroundColor: AppTheme.electricBlue,
+              backgroundImage: widget.chatData['profile_photo_url'] != null ? NetworkImage(widget.chatData['profile_photo_url']) : null,
+              child: widget.chatData['profile_photo_url'] == null ? Text(widget.chatData['name'][0]) : null,
             ),
             const SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(widget.chatData['name'], style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-                const Text('Online', style: TextStyle(fontSize: 12, color: Colors.green)),
+                const Text('Online', style: TextStyle(fontSize: 12, color: AppTheme.acidGreen)),
               ],
             ),
           ],
@@ -86,13 +101,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                       margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       decoration: BoxDecoration(
-                        color: msg['isMe'] ? AppTheme.electricBlue : AppTheme.surfaceDark,
-                        borderRadius: BorderRadius.only(
-                          topLeft: const Radius.circular(20),
-                          topRight: const Radius.circular(20),
-                          bottomLeft: Radius.circular(msg['isMe'] ? 20 : 0),
-                          bottomRight: Radius.circular(msg['isMe'] ? 0 : 20),
-                        ),
+                        gradient: msg['isMe'] ? AppTheme.primaryGradient : null,
+                        color: msg['isMe'] ? null : AppTheme.surfaceDark,
+                        borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(msg['text'], style: const TextStyle(color: Colors.white)),
                     ),
@@ -101,8 +112,28 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               },
             ),
           ),
+          _buildEmojiBar(),
           _buildInput(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildEmojiBar() {
+    final emojis = ['🔥', '❤️', '😂', '🌍', '🤔', '🙌', '✨', '🤖'];
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: emojis.length,
+        itemBuilder: (context, index) => GestureDetector(
+          onTap: () => _addEmoji(emojis[index]),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text(emojis[index], style: const TextStyle(fontSize: 24)),
+          ),
+        ),
       ),
     );
   }
@@ -114,21 +145,16 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       child: SafeArea(
         child: Row(
           children: [
+            IconButton(icon: const Icon(Icons.mic, color: AppTheme.textGrey), onPressed: () {}),
             Expanded(
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: AppTheme.darkBackground,
-                  borderRadius: BorderRadius.circular(30),
-                ),
+                decoration: BoxDecoration(color: AppTheme.darkBackground, borderRadius: BorderRadius.circular(30)),
                 child: TextField(
                   controller: _messageController,
                   style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    hintText: 'Type a message...',
-                    hintStyle: TextStyle(color: Colors.grey),
-                    border: InputBorder.none,
-                  ),
+                  decoration: const InputDecoration(hintText: 'Type a message...', hintStyle: TextStyle(color: Colors.grey), border: InputBorder.none),
+                  onSubmitted: (_) => _sendMessage(),
                 ),
               ),
             ),
@@ -137,7 +163,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               onTap: _sendMessage,
               child: Container(
                 padding: const EdgeInsets.all(12),
-                decoration: const BoxDecoration(color: AppTheme.neonPink, shape: BoxShape.circle),
+                decoration: const BoxDecoration(gradient: AppTheme.viralGradient, shape: BoxShape.circle),
                 child: const Icon(Icons.send, color: Colors.white, size: 20),
               ),
             ),
