@@ -4,6 +4,7 @@ import 'package:qiviz/core/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:video_player/video_player.dart';
 import 'package:animate_do/animate_do.dart';
+import 'package:qiviz/features/dares/presentation/screens/create_post_screen.dart';
 
 class DaresScreen extends StatefulWidget {
   const DaresScreen({super.key});
@@ -70,7 +71,7 @@ class _DaresScreenState extends State<DaresScreen> {
           Text('No viral dares yet!', style: GoogleFonts.outfit(fontSize: 22, color: AppTheme.textWhite)),
           const SizedBox(height: 8),
           ElevatedButton(
-            onPressed: () {},
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CreatePostScreen())),
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.neonPink),
             child: const Text('Be the First! 🔥'),
           ),

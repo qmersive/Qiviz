@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:qiviz/core/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:animate_do/animate_do.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:go_router/go_router.dart';
 
@@ -17,8 +18,9 @@ class _HomeScreenState extends State<HomeScreen> {
   final _supabase = Supabase.instance.client;
   List<Map<String, dynamic>> _users = [];
   List<Map<String, dynamic>> _onlineUsers = [];
+  List<Map<String, dynamic>> _suggestions = [];
   bool _isLoading = true;
-  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
   RealtimeChannel? _inviteSubscription;
 
   @override
@@ -31,6 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _inviteSubscription?.unsubscribe();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -52,6 +55,20 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       setState(() => _isLoading = false);
     }
+  }
+
+  void _onSearchChanged(String query) {
+    if (query.isEmpty) {
+      setState(() => _suggestions = []);
+      return;
+    }
+    setState(() {
+      _suggestions = _users.where((user) {
+        final name = (user['name'] ?? '').toString().toLowerCase();
+        final username = (user['username'] ?? '').toString().toLowerCase();
+        return name.contains(query.toLowerCase()) || username.contains(query.toLowerCase());
+      }).toList();
+    });
   }
 
   void _listenForInvites() {
@@ -137,27 +154,26 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredUsers = _users.where((user) {
-      final name = (user['name'] ?? '').toString().toLowerCase();
-      final username = (user['username'] ?? '').toString().toLowerCase();
-      return name.contains(_searchQuery.toLowerCase()) || username.contains(_searchQuery.toLowerCase());
-    }).toList();
-
     return Scaffold(
       backgroundColor: AppTheme.darkBackground,
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            _buildHeader(),
-            _buildOnlineSection(),
-            _buildSearchBar(),
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator(color: AppTheme.electricBlue))
-                  : filteredUsers.isEmpty
-                      ? _buildEmptyState()
-                      : _buildSwipeStack(filteredUsers),
+            Column(
+              children: [
+                _buildHeader(),
+                _buildOnlineSection(),
+                _buildSearchBar(),
+                Expanded(
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator(color: AppTheme.electricBlue))
+                      : _users.isEmpty
+                          ? _buildEmptyState()
+                          : _buildSwipeStack(_users),
+                ),
+              ],
             ),
+            if (_suggestions.isNotEmpty) _buildSearchSuggestions(),
           ],
         ),
       ),
@@ -236,9 +252,42 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(color: AppTheme.surfaceDark.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(16)),
         child: TextField(
-          onChanged: (v) => setState(() => _searchQuery = v),
+          controller: _searchController,
+          onChanged: _onSearchChanged,
           style: const TextStyle(color: AppTheme.textWhite),
-          decoration: const InputDecoration(hintText: 'Search students...', hintStyle: TextStyle(color: AppTheme.textGrey), border: InputBorder.none, icon: Icon(Icons.search, color: AppTheme.electricBlue)),
+          decoration: const InputDecoration(
+            hintText: 'Search students...',
+            hintStyle: TextStyle(color: AppTheme.textGrey),
+            border: InputBorder.none,
+            icon: Icon(Icons.search, color: AppTheme.electricBlue),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchSuggestions() {
+    return Positioned(
+      top: 200, left: 24, right: 24,
+      child: Container(
+        constraints: const BoxConstraints(maxHeight: 300),
+        decoration: BoxDecoration(color: AppTheme.surfaceDark, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 20)]),
+        child: ListView.builder(
+          shrinkWrap: true,
+          itemCount: _suggestions.length,
+          itemBuilder: (context, index) {
+            final user = _suggestions[index];
+            return ListTile(
+              leading: CircleAvatar(child: Text(user['name'][0])),
+              title: Text(user['name'], style: const TextStyle(color: Colors.white)),
+              subtitle: Text('@${user['username']}', style: const TextStyle(color: AppTheme.electricBlue)),
+              onTap: () {
+                _searchController.clear();
+                setState(() => _suggestions = []);
+                _sendInvite(user);
+              },
+            );
+          },
         ),
       ),
     );
@@ -247,7 +296,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildSwipeStack(List<Map<String, dynamic>> users) {
     return CardSwiper(
       controller: _controller,
-      numberOfCardsDisplayed: 3,
+      numberOfCardsDisplayed: users.length < 3 ? users.length : 3,
       onSwipe: _handleSwipe,
       cards: users.map((u) => _buildUserCard(u)).toList(),
     );
@@ -255,7 +304,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool _handleSwipe(int index, CardSwiperDirection direction) {
     if (direction == CardSwiperDirection.right) {
-      _handleMatch(_users[index]);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Matched with ${_users[index]['name']}! 💖')),
+      );
     }
     return true;
   }
@@ -267,7 +318,10 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(24),
         child: Stack(
           children: [
-            const Center(child: Icon(Icons.person, size: 100, color: AppTheme.textGrey)),
+            if (user['profile_photo_url'] != null)
+              Image.network(user['profile_photo_url'], fit: BoxFit.cover, width: double.infinity, height: double.infinity)
+            else
+              const Center(child: Icon(Icons.person, size: 100, color: AppTheme.textGrey)),
             Positioned(
               bottom: 0, left: 0, right: 0,
               child: Container(
@@ -279,26 +333,30 @@ class _HomeScreenState extends State<HomeScreen> {
                     Text(user['name'] ?? '', style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.textWhite)),
                     Text('@${user['username'] ?? ''}', style: const TextStyle(color: AppTheme.electricBlue)),
                     const SizedBox(height: 12),
-                    ElevatedButton.icon(
-                      onPressed: () => _sendInvite(user),
-                      icon: const Icon(Icons.videocam, size: 18),
-                      label: const Text('Invite to Game'),
-                      style: ElevatedButton.styleFrom(backgroundColor: AppTheme.neonPink, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                    Row(
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: () => _sendInvite(user),
+                          icon: const Icon(Icons.videocam, size: 18),
+                          label: const Text('Invite to Game'),
+                          style: ElevatedButton.styleFrom(backgroundColor: AppTheme.neonPink, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                        ),
+                        if (user['is_streaming'] == true) ...[
+                          const SizedBox(width: 8),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              context.push('/game', extra: {
+                                'name': user['name'],
+                                'channel': 'room_${user['id']}',
+                              });
+                            },
+                            icon: const Icon(Icons.live_tv, size: 18),
+                            label: const Text('Join Live'),
+                            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.electricBlue, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                          ),
+                        ],
+                      ],
                     ),
-                    if (user['is_streaming'] == true) ...[
-                      const SizedBox(height: 8),
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          context.push('/game', extra: {
-                            'name': user['name'],
-                            'channel': 'room_${user['id']}', // Assuming standard room name for streaming
-                          });
-                        },
-                        icon: const Icon(Icons.live_tv, size: 18),
-                        label: const Text('Join Live'),
-                        style: ElevatedButton.styleFrom(backgroundColor: AppTheme.electricBlue, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -310,14 +368,4 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildEmptyState() => const Center(child: Text('No users found.', style: TextStyle(color: AppTheme.textGrey)));
-
-  void _handleMatch(Map<String, dynamic> user) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Matched with ${user['name']}! 💖'),
-        backgroundColor: AppTheme.neonPink,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
 }

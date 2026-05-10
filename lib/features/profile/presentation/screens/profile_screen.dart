@@ -6,6 +6,8 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qiviz/core/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:animate_do/animate_do.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -29,12 +31,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final user = _supabase.auth.currentUser;
       if (user != null) {
-        final response = await _supabase
-            .from('profiles')
-            .select()
-            .eq('id', user.id)
-            .single();
-
+        final response = await _supabase.from('profiles').select().eq('id', user.id).single();
         if (mounted) {
           setState(() {
             _profile = response;
@@ -44,6 +41,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _uploadProfilePhoto() async {
+    final picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 50);
+    
+    if (image == null) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final user = _supabase.auth.currentUser;
+      final file = File(image.path);
+      final fileName = '${user?.id}_profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final path = 'profiles/$fileName';
+
+      // Upload to media bucket
+      await _supabase.storage.from('media').upload(path, file);
+      final url = _supabase.storage.from('media').getPublicUrl(path);
+
+      // Update profile
+      await _supabase.from('profiles').update({'profile_photo_url': url}).eq('id', user?.id ?? '');
+      _fetchProfile();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
+      setState(() => _isLoading = false);
     }
   }
 
@@ -58,27 +82,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.all(16.0),
-              child: Text('Scan QR to Add Friend', style: GoogleFonts.outfit(color: AppTheme.textWhite, fontSize: 20, fontWeight: FontWeight.bold)),
+              child: Text('Scan Friend\'s QR', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
             ),
             Expanded(
               child: MobileScanner(
                 onDetect: (capture) {
                   final List<Barcode> barcodes = capture.barcodes;
                   for (final barcode in barcodes) {
-                    if (barcode.rawValue != null) {
-                      Navigator.pop(context);
-                      _navigateToUser(barcode.rawValue!);
-                      break;
-                    }
+                    debugPrint('Barcode found! ${barcode.rawValue}');
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Friend Added: ${barcode.rawValue}')));
                   }
                 },
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
               ),
             ),
           ],
@@ -87,52 +102,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _navigateToUser(String qrCodeId) {
-    // In a real app, you'd fetch the user ID from the qrCodeId
-    // For now, let's just show a snackbar
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Scanned user: $qrCodeId. Navigating...')),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return const Scaffold(body: Center(child: CircularProgressIndicator(color: AppTheme.primaryPurple)));
-    if (_profile == null) return const Scaffold(body: Center(child: Text('Profile not found')));
+    if (_isLoading) return const Scaffold(backgroundColor: AppTheme.darkBackground, body: Center(child: CircularProgressIndicator(color: AppTheme.electricBlue)));
+    if (_profile == null) return const Scaffold(backgroundColor: AppTheme.darkBackground, body: Center(child: Text('Profile not found.')));
 
     return Scaffold(
       backgroundColor: AppTheme.darkBackground,
-      appBar: AppBar(
-        title: Text('My Profile', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: AppTheme.textWhite)),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: [
-          IconButton(icon: const Icon(Icons.qr_code_scanner, color: AppTheme.electricBlue), onPressed: _scanQRCode),
-          IconButton(icon: const Icon(Icons.logout, color: AppTheme.neonPink), onPressed: () => _supabase.auth.signOut().then((_) => context.go('/login'))),
-        ],
-      ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 60),
         child: Column(
           children: [
-            FadeInDown(
+            GestureDetector(
+              onTap: _uploadProfilePhoto,
               child: Stack(
-                alignment: Alignment.center,
                 children: [
                   Container(
-                    width: 120, height: 120,
-                    decoration: BoxDecoration(shape: BoxShape.circle, gradient: const LinearGradient(colors: [AppTheme.neonPink, AppTheme.primaryPurple]), boxShadow: [BoxShadow(color: AppTheme.primaryPurple.withValues(alpha: 0.5), blurRadius: 20)]),
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [AppTheme.electricBlue, AppTheme.neonPink])),
+                    child: CircleAvatar(
+                      radius: 60,
+                      backgroundColor: AppTheme.surfaceDark,
+                      backgroundImage: _profile!['profile_photo_url'] != null ? NetworkImage(_profile!['profile_photo_url']) : null,
+                      child: _profile!['profile_photo_url'] == null ? const Icon(Icons.add_a_photo, size: 30, color: Colors.white) : null,
+                    ),
                   ),
-                  const CircleAvatar(radius: 55, backgroundColor: AppTheme.surfaceDark, child: Icon(Icons.person, size: 60, color: AppTheme.textWhite)),
+                  Positioned(right: 0, bottom: 0, child: Container(padding: const EdgeInsets.all(4), decoration: const BoxDecoration(color: AppTheme.electricBlue, shape: BoxShape.circle), child: const Icon(Icons.edit, size: 16, color: Colors.white))),
                 ],
               ),
             ),
             const SizedBox(height: 20),
             Text(_profile!['name'] ?? 'User', style: GoogleFonts.outfit(fontSize: 28, fontWeight: FontWeight.bold, color: AppTheme.textWhite)),
-            Text(
-              '@${_profile!['username'] ?? 'user'}',
-              style: const TextStyle(color: AppTheme.electricBlue, fontSize: 16, fontWeight: FontWeight.w600),
-            ),
+            Text('@${_profile!['username'] ?? 'user'}', style: const TextStyle(color: AppTheme.electricBlue, fontSize: 16, fontWeight: FontWeight.w600)),
             const SizedBox(height: 16),
             if (_profile!['is_admin'] == true)
               FadeInUp(
@@ -142,23 +143,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     onPressed: () => context.push('/admin'),
                     icon: const Icon(Icons.admin_panel_settings),
                     label: const Text('Admin Dashboard'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryPurple,
-                      foregroundColor: AppTheme.textWhite,
-                      minimumSize: const Size(double.infinity, 50),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    ),
+                    style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryPurple, foregroundColor: AppTheme.textWhite, minimumSize: const Size(double.infinity, 50), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
                   ),
                 ),
               ),
             const SizedBox(height: 16),
-            
             _buildGlassCard(Icons.flag, 'From', _profile!['country']),
             _buildGlassCard(Icons.school, 'University', _profile!['university']),
-            _buildGlassCard(Icons.info_outline, 'Bio', _profile!['bio']),
-
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(child: _buildActionBtn(Icons.qr_code, 'My QR', () => _showMyQR())),
+                const SizedBox(width: 16),
+                Expanded(child: _buildActionBtn(Icons.qr_code_scanner, 'Scan', _scanQRCode)),
+              ],
+            ),
             const SizedBox(height: 32),
-            _buildQRSection(),
+            _buildStats(),
           ],
         ),
       ),
@@ -166,52 +167,72 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildGlassCard(IconData icon, String title, String? value) {
-    return FadeInUp(
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppTheme.surfaceDark.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppTheme.textWhite.withValues(alpha: 0.05)),
-        ),
-        child: Row(
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: AppTheme.surfaceDark.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(20), border: Border.all(color: AppTheme.textWhite.withValues(alpha: 0.05))),
+      child: Row(
+        children: [
+          Icon(icon, color: AppTheme.electricBlue, size: 20),
+          const SizedBox(width: 16),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(color: AppTheme.textGrey, fontSize: 12)),
+              Text(value ?? 'Not set', style: const TextStyle(color: AppTheme.textWhite, fontWeight: FontWeight.bold)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionBtn(IconData icon, String label, VoidCallback onTap) {
+    return ElevatedButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 18),
+      label: Text(label),
+      style: ElevatedButton.styleFrom(backgroundColor: AppTheme.surfaceDark, foregroundColor: AppTheme.textWhite, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: AppTheme.textWhite.withValues(alpha: 0.1)))),
+    );
+  }
+
+  void _showMyQR() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.surfaceDark,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: AppTheme.electricBlue),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: TextStyle(color: AppTheme.textGrey.withValues(alpha: 0.7), fontSize: 12)),
-                  Text(value ?? 'N/A', style: const TextStyle(color: AppTheme.textWhite, fontSize: 16, fontWeight: FontWeight.w500)),
-                ],
-              ),
-            ),
+            Text('Scan to Connect', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+            const SizedBox(height: 20),
+            Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)), child: QrImageView(data: _profile!['id'], version: QrVersions.auto, size: 200.0)),
+            const SizedBox(height: 20),
+            Text('@${_profile!['username']}', style: const TextStyle(color: AppTheme.electricBlue, fontWeight: FontWeight.bold)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildQRSection() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
-      ),
-      child: Column(
-        children: [
-          QrImageView(
-            data: _profile!['qr_code_id'] ?? _profile!['id'],
-            version: QrVersions.auto,
-            size: 200.0,
-          ),
-          const SizedBox(height: 12),
-          const Text('Your Unique Qiviz QR', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-        ],
-      ),
+  Widget _buildStats() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceAround,
+      children: [
+        _buildStatItem('342', 'Friends'),
+        _buildStatItem('12', 'Dares'),
+        _buildStatItem('850', 'XP'),
+      ],
+    );
+  }
+
+  Widget _buildStatItem(String val, String label) {
+    return Column(
+      children: [
+        Text(val, style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.textWhite)),
+        Text(label, style: const TextStyle(color: AppTheme.textGrey)),
+      ],
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:qiviz/core/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:animate_do/animate_do.dart';
@@ -68,7 +69,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   return FadeInUp(
                     delay: Duration(milliseconds: index * 100),
                     child: ListTile(
-                      onTap: () {},
+                      onTap: () => context.push('/chat', extra: chat),
                       leading: Stack(
                         children: [
                           CircleAvatar(
