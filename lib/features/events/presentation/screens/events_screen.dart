@@ -86,7 +86,7 @@ class _EventsScreenState extends State<EventsScreen> {
                                 Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: AppTheme.primaryPurple.withOpacity(0.2),
+                                    color: AppTheme.primaryPurple.withValues(alpha: 0.2),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Column(

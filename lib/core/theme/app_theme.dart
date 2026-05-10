@@ -45,7 +45,7 @@ class AppTheme {
           backgroundColor: primaryPurple,
           foregroundColor: textWhite,
           elevation: 8,
-          shadowColor: primaryPurple.withOpacity(0.5),
+          shadowColor: primaryPurple.withValues(alpha: 0.5),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),

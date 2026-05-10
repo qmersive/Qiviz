@@ -3,7 +3,6 @@ import 'package:qiviz/features/home/presentation/screens/home_screen.dart';
 import 'package:qiviz/features/events/presentation/screens/events_screen.dart';
 import 'package:qiviz/features/dares/presentation/screens/dares_screen.dart';
 import 'package:qiviz/features/profile/presentation/screens/profile_screen.dart';
-import 'package:qiviz/core/theme/app_theme.dart';
 
 class MainScaffold extends StatefulWidget {
   const MainScaffold({super.key});

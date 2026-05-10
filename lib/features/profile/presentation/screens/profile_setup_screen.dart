@@ -141,7 +141,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     double progress = (_currentPage + 1) / _totalPages;
 
     return Scaffold(
-      backgroundColor: AppTheme.backgroundDark,
+      backgroundColor: AppTheme.darkBackground,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -194,7 +194,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.electricBlue.withOpacity(0.1),
+            color: AppTheme.electricBlue.withValues(alpha: 0.1),
             blurRadius: 20,
             offset: const Offset(0, -5),
           )
@@ -351,7 +351,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                     color: isSelected ? AppTheme.neonPink : AppTheme.surfaceDark,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: isSelected ? AppTheme.neonPink : AppTheme.textGrey.withOpacity(0.3),
+                      color: isSelected ? AppTheme.neonPink : AppTheme.textGrey.withValues(alpha: 0.3),
                     ),
                   ),
                   child: Text(
@@ -396,7 +396,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                     color: isSelected ? AppTheme.electricBlue : AppTheme.surfaceDark,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: isSelected ? AppTheme.electricBlue : AppTheme.textGrey.withOpacity(0.3),
+                      color: isSelected ? AppTheme.electricBlue : AppTheme.textGrey.withValues(alpha: 0.3),
                     ),
                   ),
                   child: Text(
@@ -451,8 +451,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           FadeInUp(
             delay: const Duration(milliseconds: 800),
             child: DropdownButtonFormField<String>(
-              value: _selectedGoal,
-              dropdownColor: AppTheme.backgroundDark,
+              initialValue: _selectedGoal,
+              dropdownColor: AppTheme.darkBackground,
               decoration: InputDecoration(
                 filled: true,
                 fillColor: AppTheme.surfaceDark,
@@ -485,7 +485,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       style: const TextStyle(color: AppTheme.textWhite),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(color: AppTheme.textGrey.withOpacity(0.5)),
+        hintStyle: TextStyle(color: AppTheme.textGrey.withValues(alpha: 0.5)),
         prefixIcon: Padding(
           padding: EdgeInsets.only(bottom: maxLines > 1 ? 70 : 0),
           child: Icon(icon, color: AppTheme.electricBlue),
