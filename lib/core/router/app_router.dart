@@ -10,6 +10,7 @@ import 'package:qiviz/features/home/presentation/screens/main_scaffold.dart';
 import 'package:qiviz/features/home/presentation/screens/home_screen.dart';
 import 'package:qiviz/features/games/presentation/screens/game_screen.dart';
 import 'package:qiviz/features/blind_date/presentation/screens/blind_date_screen.dart';
+import 'package:qiviz/features/admin/presentation/screens/admin_dashboard_screen.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -26,6 +27,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/profile-setup',
         builder: (context, state) => const ProfileSetupScreen(),
+      ),
+      GoRoute(
+        path: '/admin',
+        builder: (context, state) => const AdminDashboardScreen(),
       ),
       GoRoute(
         path: '/',

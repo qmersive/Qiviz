@@ -18,16 +18,15 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   
   bool _isLoading = false;
   int _currentPage = 0;
-  final int _totalPages = 4;
+  final int _totalPages = 5; // Increased steps to make each one shorter
 
   final _nameController = TextEditingController();
-  final _nicknameController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _countryController = TextEditingController();
   final _universityController = TextEditingController();
   final _cityController = TextEditingController();
   final _bioController = TextEditingController();
   
-  // Vibe Check (Step 3) Collections
   final Set<String> _selectedInterests = {};
   final List<String> _availableInterests = [
     'Anime', 'Gaming', 'Coding', 'Music', 'Travel', 'Photography',
@@ -54,7 +53,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   void dispose() {
     _pageController.dispose();
     _nameController.dispose();
-    _nicknameController.dispose();
+    _usernameController.dispose();
     _countryController.dispose();
     _universityController.dispose();
     _cityController.dispose();
@@ -63,20 +62,24 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   }
 
   void _nextPage() {
-    // Validate current page before moving to next
     if (_currentPage == 0) {
-      if (_nameController.text.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter your full name!')));
+      if (_nameController.text.trim().isEmpty || _usernameController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter your name and username!')));
         return;
       }
     } else if (_currentPage == 1) {
       if (_countryController.text.trim().isEmpty || _universityController.text.trim().isEmpty || _cityController.text.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill out your origin details!')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill out your university details!')));
         return;
       }
     } else if (_currentPage == 2) {
-      if (_selectedInterests.isEmpty || _selectedLanguages.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select at least one interest and language!')));
+      if (_selectedInterests.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pick at least one interest! ✨')));
+        return;
+      }
+    } else if (_currentPage == 3) {
+      if (_selectedLanguages.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select at least one language! 🗣️')));
         return;
       }
     }
@@ -96,7 +99,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
   Future<void> _saveProfile() async {
     if (_bioController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please write a short bio!')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Write a short bio to finish!')));
       return;
     }
 
@@ -109,7 +112,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       await Supabase.instance.client.from('profiles').upsert({
         'id': user.id,
         'name': _nameController.text.trim(),
-        'nickname': _nicknameController.text.trim(),
+        'username': _usernameController.text.trim(),
         'country': _countryController.text.trim(),
         'university': _universityController.text.trim(),
         'city': _cityController.text.trim(),
@@ -158,30 +161,24 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           ),
         ),
       ),
-      body: Form(
-        key: _formKey,
-        child: Column(
-          children: [
-            Expanded(
-              child: PageView(
-                controller: _pageController,
-                physics: const NeverScrollableScrollPhysics(), // Prevent manual swiping
-                onPageChanged: (int page) {
-                  setState(() {
-                    _currentPage = page;
-                  });
-                },
-                children: [
-                  _buildStep1(),
-                  _buildStep2(),
-                  _buildStep3(),
-                  _buildStep4(),
-                ],
-              ),
+      body: Column(
+        children: [
+          Expanded(
+            child: PageView(
+              controller: _pageController,
+              physics: const NeverScrollableScrollPhysics(),
+              onPageChanged: (int page) => setState(() => _currentPage = page),
+              children: [
+                _buildStep1(), // Identity
+                _buildStep2(), // Origins
+                _buildStep3(), // Interests
+                _buildStep4(), // Languages
+                _buildStep5(), // Bio & Goal
+              ],
             ),
-            _buildBottomBar(),
-          ],
-        ),
+          ),
+          _buildBottomBar(),
+        ],
       ),
     );
   }
@@ -190,15 +187,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceDark,
+        color: AppTheme.surfaceDark.withValues(alpha: 0.8),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.electricBlue.withValues(alpha: 0.1),
-            blurRadius: 20,
-            offset: const Offset(0, -5),
-          )
-        ],
+        border: Border.all(color: AppTheme.textWhite.withValues(alpha: 0.1)),
       ),
       child: SafeArea(
         child: SizedBox(
@@ -209,16 +200,13 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.electricBlue,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              elevation: 0,
             ),
             child: _isLoading
                 ? const CircularProgressIndicator(color: AppTheme.textWhite)
                 : Text(
-                    _currentPage == _totalPages - 1 ? 'Start Exploring 🔥' : 'Continue 🚀',
-                    style: GoogleFonts.outfit(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.textWhite,
-                    ),
+                    _currentPage == _totalPages - 1 ? 'LFG! 🔥' : 'Continue 🚀',
+                    style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textWhite),
                   ),
           ),
         ),
@@ -233,30 +221,13 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          FadeInDown(
-            child: Text(
-              'Welcome to Qiviz! 🎉',
-              style: GoogleFonts.outfit(fontSize: 36, fontWeight: FontWeight.bold, color: AppTheme.neonPink),
-            ),
-          ),
-          const SizedBox(height: 16),
-          FadeInUp(
-            delay: const Duration(milliseconds: 200),
-            child: Text(
-              'Let\'s get your identity set up so you can start connecting.',
-              style: GoogleFonts.inter(fontSize: 16, color: AppTheme.textGrey),
-            ),
-          ),
+          FadeInDown(child: Text('Who are you? 🎉', style: GoogleFonts.outfit(fontSize: 32, fontWeight: FontWeight.bold, color: AppTheme.neonPink))),
+          const SizedBox(height: 12),
+          FadeInUp(delay: const Duration(milliseconds: 200), child: Text('Pick a unique username so people can find you.', style: GoogleFonts.inter(fontSize: 16, color: AppTheme.textGrey))),
           const SizedBox(height: 40),
-          FadeInUp(
-            delay: const Duration(milliseconds: 400),
-            child: _buildTextField(_nameController, 'Your Full Name', Icons.person),
-          ),
+          FadeInUp(delay: const Duration(milliseconds: 400), child: _buildTextField(_nameController, 'Full Name', Icons.person)),
           const SizedBox(height: 20),
-          FadeInUp(
-            delay: const Duration(milliseconds: 600),
-            child: _buildTextField(_nicknameController, 'A Cool Nickname (Optional)', Icons.alternate_email),
-          ),
+          FadeInUp(delay: const Duration(milliseconds: 600), child: _buildTextField(_usernameController, 'Username', Icons.alternate_email)),
         ],
       ),
     );
@@ -269,209 +240,90 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          FadeInRight(
-            child: Text(
-              'Your Origins 🌍',
-              style: GoogleFonts.outfit(fontSize: 36, fontWeight: FontWeight.bold, color: AppTheme.electricBlue),
-            ),
-          ),
-          const SizedBox(height: 16),
-          FadeInUp(
-            delay: const Duration(milliseconds: 200),
-            child: Text(
-              'Where are you from, and where are you studying?',
-              style: GoogleFonts.inter(fontSize: 16, color: AppTheme.textGrey),
-            ),
-          ),
+          FadeInRight(child: Text('Your Journey 🌍', style: GoogleFonts.outfit(fontSize: 32, fontWeight: FontWeight.bold, color: AppTheme.electricBlue))),
+          const SizedBox(height: 12),
+          FadeInUp(delay: const Duration(milliseconds: 200), child: Text('Tell us where you are based in India.', style: GoogleFonts.inter(fontSize: 16, color: AppTheme.textGrey))),
           const SizedBox(height: 40),
-          FadeInUp(
-            delay: const Duration(milliseconds: 400),
-            child: _buildTextField(_countryController, 'Home Country', Icons.flag),
-          ),
+          FadeInUp(delay: const Duration(milliseconds: 400), child: _buildTextField(_countryController, 'Home Country', Icons.flag)),
           const SizedBox(height: 20),
-          FadeInUp(
-            delay: const Duration(milliseconds: 600),
-            child: _buildTextField(_universityController, 'University in India', Icons.school),
-          ),
+          FadeInUp(delay: const Duration(milliseconds: 600), child: _buildTextField(_universityController, 'University', Icons.school)),
           const SizedBox(height: 20),
-          FadeInUp(
-            delay: const Duration(milliseconds: 800),
-            child: _buildTextField(_cityController, 'Current City in India', Icons.location_city),
-          ),
+          FadeInUp(delay: const Duration(milliseconds: 800), child: _buildTextField(_cityController, 'City', Icons.location_city)),
         ],
       ),
     );
   }
 
   Widget _buildStep3() {
-    return ListView(
-      padding: const EdgeInsets.all(32.0),
-      children: [
-        FadeInRight(
-          child: Text(
-            'Vibe Check ⚡',
-            style: GoogleFonts.outfit(fontSize: 36, fontWeight: FontWeight.bold, color: AppTheme.neonPink),
-          ),
-        ),
-        const SizedBox(height: 16),
-        FadeInUp(
-          delay: const Duration(milliseconds: 200),
-          child: Text(
-            'What are you into? Select your interests to find your tribe.',
-            style: GoogleFonts.inter(fontSize: 16, color: AppTheme.textGrey),
-          ),
-        ),
-        const SizedBox(height: 32),
-        FadeInUp(
-          delay: const Duration(milliseconds: 400),
-          child: Text('Interests', style: GoogleFonts.outfit(fontSize: 20, color: AppTheme.textWhite, fontWeight: FontWeight.w600)),
-        ),
-        const SizedBox(height: 16),
-        FadeInUp(
-          delay: const Duration(milliseconds: 600),
-          child: Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: _availableInterests.map((interest) {
-              final isSelected = _selectedInterests.contains(interest);
-              return GestureDetector(
-                onTap: () {
-                  setState(() {
-                    if (isSelected) {
-                      _selectedInterests.remove(interest);
-                    } else {
-                      _selectedInterests.add(interest);
-                    }
-                  });
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: isSelected ? AppTheme.neonPink : AppTheme.surfaceDark,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: isSelected ? AppTheme.neonPink : AppTheme.textGrey.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Text(
-                    interest,
-                    style: TextStyle(
-                      color: isSelected ? AppTheme.textWhite : AppTheme.textGrey,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-        const SizedBox(height: 32),
-        FadeInUp(
-          delay: const Duration(milliseconds: 800),
-          child: Text('Languages I Speak', style: GoogleFonts.outfit(fontSize: 20, color: AppTheme.textWhite, fontWeight: FontWeight.w600)),
-        ),
-        const SizedBox(height: 16),
-        FadeInUp(
-          delay: const Duration(milliseconds: 1000),
-          child: Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: _availableLanguages.map((lang) {
-              final isSelected = _selectedLanguages.contains(lang);
-              return GestureDetector(
-                onTap: () {
-                  setState(() {
-                    if (isSelected) {
-                      _selectedLanguages.remove(lang);
-                    } else {
-                      _selectedLanguages.add(lang);
-                    }
-                  });
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: isSelected ? AppTheme.electricBlue : AppTheme.surfaceDark,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: isSelected ? AppTheme.electricBlue : AppTheme.textGrey.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Text(
-                    lang,
-                    style: TextStyle(
-                      color: isSelected ? AppTheme.textWhite : AppTheme.textGrey,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-        const SizedBox(height: 40),
-      ],
+    return _buildChipsStep(
+      title: 'Interests ⚡',
+      subtitle: 'Select what you love to do.',
+      items: _availableInterests,
+      selectedItems: _selectedInterests,
+      activeColor: AppTheme.neonPink,
     );
   }
 
   Widget _buildStep4() {
+    return _buildChipsStep(
+      title: 'Languages 🗣️',
+      subtitle: 'What languages do you speak?',
+      items: _availableLanguages,
+      selectedItems: _selectedLanguages,
+      activeColor: AppTheme.electricBlue,
+    );
+  }
+
+  Widget _buildChipsStep({required String title, required String subtitle, required List<String> items, required Set<String> selectedItems, required Color activeColor}) {
+    return ListView(
+      padding: const EdgeInsets.all(32.0),
+      children: [
+        FadeInRight(child: Text(title, style: GoogleFonts.outfit(fontSize: 32, fontWeight: FontWeight.bold, color: activeColor))),
+        const SizedBox(height: 12),
+        FadeInUp(delay: const Duration(milliseconds: 200), child: Text(subtitle, style: GoogleFonts.inter(fontSize: 16, color: AppTheme.textGrey))),
+        const SizedBox(height: 32),
+        Wrap(
+          spacing: 10, runSpacing: 10,
+          children: items.map((item) {
+            final isSelected = selectedItems.contains(item);
+            return GestureDetector(
+              onTap: () => setState(() => isSelected ? selectedItems.remove(item) : selectedItems.add(item)),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: isSelected ? activeColor : AppTheme.surfaceDark.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: isSelected ? activeColor : AppTheme.textGrey.withValues(alpha: 0.3)),
+                ),
+                child: Text(item, style: TextStyle(color: isSelected ? AppTheme.textWhite : AppTheme.textGrey, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStep5() {
     return Padding(
       padding: const EdgeInsets.all(32.0),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          FadeInRight(
-            child: Text(
-              'Final Touch 🎯',
-              style: GoogleFonts.outfit(fontSize: 36, fontWeight: FontWeight.bold, color: AppTheme.electricBlue),
-            ),
-          ),
-          const SizedBox(height: 16),
-          FadeInUp(
-            delay: const Duration(milliseconds: 200),
-            child: Text(
-              'Tell people a little bit about yourself and what you are looking for on Qiviz.',
-              style: GoogleFonts.inter(fontSize: 16, color: AppTheme.textGrey),
-            ),
-          ),
+          FadeInRight(child: Text('Final Touch 🎯', style: GoogleFonts.outfit(fontSize: 32, fontWeight: FontWeight.bold, color: AppTheme.electricBlue))),
           const SizedBox(height: 40),
-          FadeInUp(
-            delay: const Duration(milliseconds: 400),
-            child: _buildTextField(_bioController, 'A short, catchy bio about you...', Icons.edit, maxLines: 4),
-          ),
+          FadeInUp(delay: const Duration(milliseconds: 400), child: _buildTextField(_bioController, 'A short bio...', Icons.edit, maxLines: 3)),
           const SizedBox(height: 32),
-          FadeInUp(
-            delay: const Duration(milliseconds: 600),
-            child: Text('My Primary Goal', style: GoogleFonts.outfit(color: AppTheme.textWhite, fontSize: 18, fontWeight: FontWeight.w600)),
-          ),
+          FadeInUp(delay: const Duration(milliseconds: 600), child: Text('Primary Goal', style: GoogleFonts.outfit(color: AppTheme.textWhite, fontSize: 18, fontWeight: FontWeight.w600))),
           const SizedBox(height: 12),
-          FadeInUp(
-            delay: const Duration(milliseconds: 800),
-            child: DropdownButtonFormField<String>(
-              initialValue: _selectedGoal,
-              dropdownColor: AppTheme.darkBackground,
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: AppTheme.surfaceDark,
-                prefixIcon: const Icon(Icons.track_changes, color: AppTheme.electricBlue),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              items: _goals.map((goal) {
-                return DropdownMenuItem(
-                  value: goal,
-                  child: Text(goal, style: const TextStyle(color: AppTheme.textWhite)),
-                );
-              }).toList(),
-              onChanged: (val) {
-                if (val != null) setState(() => _selectedGoal = val);
-              },
-            ),
+          DropdownButtonFormField<String>(
+            initialValue: _selectedGoal,
+            dropdownColor: AppTheme.darkBackground,
+            decoration: InputDecoration(filled: true, fillColor: AppTheme.surfaceDark, prefixIcon: const Icon(Icons.track_changes, color: AppTheme.electricBlue), border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)),
+            items: _goals.map((goal) => DropdownMenuItem(value: goal, child: Text(goal, style: const TextStyle(color: AppTheme.textWhite)))).toList(),
+            onChanged: (val) { if (val != null) setState(() => _selectedGoal = val); },
           ),
         ],
       ),
@@ -479,26 +331,19 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   }
 
   Widget _buildTextField(TextEditingController controller, String hint, IconData icon, {int maxLines = 1}) {
-    return TextFormField(
-      controller: controller,
-      maxLines: maxLines,
-      style: const TextStyle(color: AppTheme.textWhite),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(color: AppTheme.textGrey.withValues(alpha: 0.5)),
-        prefixIcon: Padding(
-          padding: EdgeInsets.only(bottom: maxLines > 1 ? 70 : 0),
-          child: Icon(icon, color: AppTheme.electricBlue),
-        ),
-        filled: true,
-        fillColor: AppTheme.surfaceDark,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide.none,
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: AppTheme.electricBlue, width: 2),
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceDark.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.textWhite.withValues(alpha: 0.05)),
+      ),
+      child: TextFormField(
+        controller: controller, maxLines: maxLines,
+        style: const TextStyle(color: AppTheme.textWhite),
+        decoration: InputDecoration(
+          hintText: hint, hintStyle: TextStyle(color: AppTheme.textGrey.withValues(alpha: 0.5)),
+          prefixIcon: Icon(icon, color: AppTheme.electricBlue),
+          border: InputBorder.none, contentPadding: const EdgeInsets.all(16),
         ),
       ),
     );

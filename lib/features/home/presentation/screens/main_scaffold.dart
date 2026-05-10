@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:qiviz/features/home/presentation/screens/home_screen.dart';
-import 'package:qiviz/features/events/presentation/screens/events_screen.dart';
+import 'package:qiviz/features/chat/presentation/screens/chat_list_screen.dart';
 import 'package:qiviz/features/dares/presentation/screens/dares_screen.dart';
 import 'package:qiviz/features/profile/presentation/screens/profile_screen.dart';
 
@@ -17,7 +17,7 @@ class _MainScaffoldState extends State<MainScaffold> {
   final List<Widget> _screens = [
     const HomeScreen(),
     const DaresScreen(),
-    const EventsScreen(),
+    const ChatListScreen(),
     const ProfileScreen(),
   ];
 
@@ -47,9 +47,9 @@ class _MainScaffoldState extends State<MainScaffold> {
             label: 'Dares',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.event_outlined),
-            activeIcon: Icon(Icons.event),
-            label: 'Events',
+            icon: Icon(Icons.chat_bubble_outline),
+            activeIcon: Icon(Icons.chat_bubble),
+            label: 'Messages',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),
