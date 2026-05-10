@@ -129,8 +129,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 20),
             Text(_profile!['name'] ?? 'User', style: GoogleFonts.outfit(fontSize: 28, fontWeight: FontWeight.bold, color: AppTheme.textWhite)),
-            Text('@${_profile!['username'] ?? 'user'}', style: const TextStyle(color: AppTheme.electricBlue, fontSize: 16, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 32),
+            Text(
+              '@${_profile!['username'] ?? 'user'}',
+              style: const TextStyle(color: AppTheme.electricBlue, fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 16),
+            if (_profile!['is_admin'] == true)
+              FadeInUp(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: ElevatedButton.icon(
+                    onPressed: () => context.push('/admin'),
+                    icon: const Icon(Icons.admin_panel_settings),
+                    label: const Text('Admin Dashboard'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryPurple,
+                      foregroundColor: AppTheme.textWhite,
+                      minimumSize: const Size(double.infinity, 50),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                  ),
+                ),
+              ),
+            const SizedBox(height: 16),
             
             _buildGlassCard(Icons.flag, 'From', _profile!['country']),
             _buildGlassCard(Icons.school, 'University', _profile!['university']),

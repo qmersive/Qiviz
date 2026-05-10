@@ -20,6 +20,7 @@ CREATE TABLE profiles (
   is_onboarded BOOLEAN DEFAULT false,
   is_online BOOLEAN DEFAULT false,
   is_streaming BOOLEAN DEFAULT false,
+  is_admin BOOLEAN DEFAULT false,
   qr_code_id TEXT UNIQUE
 );
 
