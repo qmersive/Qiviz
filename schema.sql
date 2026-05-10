@@ -116,7 +116,7 @@ CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 BEGIN
   INSERT INTO public.profiles (id, qr_code_id)
-  VALUES (new.id, encode(gen_random_bytes(10), 'hex'));
+  VALUES (new.id, substr(md5(random()::text), 1, 10));
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -128,3 +128,45 @@ CREATE OR REPLACE TRIGGER on_auth_user_created
 
 -- Enable Storage (Needs to be done via dashboard or API but we can define buckets later)
 -- Example Bucket: profile_photos
+
+-- ==========================================
+-- SEED DATA: Demo User
+-- ==========================================
+-- This creates a test user you can login with.
+-- Email: demo@qiviz.com
+-- Password: password123
+
+INSERT INTO auth.users (
+  id,
+  instance_id,
+  email,
+  encrypted_password,
+  email_confirmed_at,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  created_at,
+  updated_at
+) VALUES (
+  'd2b45070-07a8-4229-8736-121dbde5f212',
+  '00000000-0000-0000-0000-000000000000',
+  'demo@qiviz.com',
+  crypt('password123', gen_salt('bf')),
+  now(),
+  '{"provider": "email", "providers": ["email"]}',
+  '{}',
+  now(),
+  now()
+) ON CONFLICT (id) DO NOTHING;
+
+-- Because of our trigger above, the profile is automatically created!
+-- Let's update the profile with some dummy data for testing the app:
+UPDATE public.profiles
+SET 
+  name = 'Demo Student',
+  nickname = 'Demoy',
+  country = 'Nigeria',
+  university = 'Delhi University',
+  city = 'New Delhi',
+  bio = 'Just testing out the Qiviz app!',
+  is_onboarded = true
+WHERE id = 'd2b45070-07a8-4229-8736-121dbde5f212';
